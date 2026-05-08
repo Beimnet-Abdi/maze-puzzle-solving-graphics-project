@@ -29,3 +29,9 @@ As a bonus feature, the program may randomly remove one extra wall to create a c
 ## Run
 
 python maze.py
+
+##PERSONAL INFO
+Name: Beimnet Abdi
+ID: UGR/8524/16
+section 1
+
