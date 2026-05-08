@@ -6,7 +6,9 @@ import random
 
 # ---------------- CONFIG ----------------
 R, C = 15, 20
+
 CELL_SIZE = 40
+
 WIDTH = C * CELL_SIZE
 HEIGHT = R * CELL_SIZE
 
@@ -14,15 +16,21 @@ HEIGHT = R * CELL_SIZE
 BG_COLOR = (143/255, 178/255, 126/255)
 
 SNAKE_TRAIL = (245/255, 232/255, 213/255)
+
 WALL_COLOR = (133/255, 162/255, 116/255)
 
 SOLVER_RED = (1.0, 0.4, 0.4)
+
 SOLVER_BLUE = (0.4, 0.6, 1.0)
 
 START_END_COLOR = (1.0, 0.635, 0.741)
 
+# NEW: cycle wall highlight
+CYCLE_COLOR = (1.0, 1.0, 0.2)
+
 # ---------------- WALL ARRAYS ----------------
 northWall = [[1 for _ in range(C + 1)] for _ in range(R + 1)]
+
 eastWall = [[1 for _ in range(C + 1)] for _ in range(R + 1)]
 
 # ---------------- VISUAL STORAGE ----------------
@@ -30,26 +38,41 @@ trail_cells = []
 
 show_points = False
 
-# store final dead ends
 final_dead_ends = set()
 
-# ---------------- START / END ----------------
-start_cell = (random.randint(1, R), random.randint(1, C))
+# store highlighted broken wall
+cycle_wall = None
 
-end_cell = (random.randint(1, R), random.randint(1, C))
+# ---------------- START / END ----------------
+start_cell = (
+    random.randint(1, R),
+    random.randint(1, C)
+)
+
+end_cell = (
+    random.randint(1, R),
+    random.randint(1, C)
+)
+
 while end_cell == start_cell:
-    end_cell = (random.randint(1, R), random.randint(1, C))
+
+    end_cell = (
+        random.randint(1, R),
+        random.randint(1, C)
+    )
 
 
 # ---------------- OPENGL ----------------
 def init_graphics():
 
     glMatrixMode(GL_PROJECTION)
+
     glLoadIdentity()
 
     gluOrtho2D(0, WIDTH, 0, HEIGHT)
 
     glMatrixMode(GL_MODELVIEW)
+
     glLoadIdentity()
 
     glViewport(0, 0, WIDTH, HEIGHT)
@@ -61,6 +84,7 @@ def init_graphics():
 def draw_filled_box(r, c, color):
 
     x = (c - 1) * CELL_SIZE
+
     y = (r - 1) * CELL_SIZE
 
     glColor3f(*color)
@@ -94,7 +118,7 @@ def draw_dots(cells, color, size):
     glEnd()
 
 
-# ---------------- DRAW EVERYTHING ----------------
+# ---------------- DRAW MAZE ----------------
 def draw_maze(path=None, dead=None):
 
     glClear(GL_COLOR_BUFFER_BIT)
@@ -103,7 +127,7 @@ def draw_maze(path=None, dead=None):
     for r, c in trail_cells:
         draw_filled_box(r, c, SNAKE_TRAIL)
 
-    # walls
+    # normal walls
     glColor3f(*WALL_COLOR)
 
     glLineWidth(3)
@@ -115,29 +139,71 @@ def draw_maze(path=None, dead=None):
         for c in range(1, C + 1):
 
             x = (c - 1) * CELL_SIZE
+
             y = (r - 1) * CELL_SIZE
 
             # north wall
             if northWall[r][c]:
+
                 glVertex2f(x, y + CELL_SIZE)
                 glVertex2f(x + CELL_SIZE, y + CELL_SIZE)
 
             # east wall
             if eastWall[r][c]:
+
                 glVertex2f(x + CELL_SIZE, y)
                 glVertex2f(x + CELL_SIZE, y + CELL_SIZE)
 
     # left boundary
     for r in range(1, R + 1):
+
         glVertex2f(0, (r - 1) * CELL_SIZE)
         glVertex2f(0, r * CELL_SIZE)
 
     # bottom boundary
     for c in range(1, C + 1):
+
         glVertex2f((c - 1) * CELL_SIZE, 0)
         glVertex2f(c * CELL_SIZE, 0)
 
     glEnd()
+
+    # ---------------- HIGHLIGHT CYCLE WALL ----------------
+    if cycle_wall:
+
+        r, c, direction = cycle_wall
+
+        x = (c - 1) * CELL_SIZE
+
+        y = (r - 1) * CELL_SIZE
+
+        glColor3f(*CYCLE_COLOR)
+
+        glLineWidth(6)
+
+        glBegin(GL_LINES)
+
+        if direction == 'N':
+
+            glVertex2f(x, y + CELL_SIZE)
+            glVertex2f(x + CELL_SIZE, y + CELL_SIZE)
+
+        elif direction == 'S':
+
+            glVertex2f(x, y)
+            glVertex2f(x + CELL_SIZE, y)
+
+        elif direction == 'E':
+
+            glVertex2f(x + CELL_SIZE, y)
+            glVertex2f(x + CELL_SIZE, y + CELL_SIZE)
+
+        elif direction == 'W':
+
+            glVertex2f(x, y)
+            glVertex2f(x, y + CELL_SIZE)
+
+        glEnd()
 
     # red solution path
     if path:
@@ -227,6 +293,69 @@ def generate():
             pygame.time.delay(15)
 
 
+# ---------------- ADD EXTRA WALL BREAK ----------------
+def add_cycle():
+
+    global cycle_wall
+
+    # 1 in 20 chance
+    if random.randint(1, 20) != 1:
+        return
+
+    for _ in range(100):
+
+        r = random.randint(1, R)
+
+        c = random.randint(1, C)
+
+        directions = []
+
+        if r < R and northWall[r][c] == 1:
+            directions.append('N')
+
+        if r > 1 and northWall[r - 1][c] == 1:
+            directions.append('S')
+
+        if c < C and eastWall[r][c] == 1:
+            directions.append('E')
+
+        if c > 1 and eastWall[r][c - 1] == 1:
+            directions.append('W')
+
+        if directions:
+
+            direction = random.choice(directions)
+
+            cycle_wall = (r, c, direction)
+
+            draw_maze()
+
+            pygame.time.delay(500)
+
+            # remove extra wall
+            if direction == 'N':
+                northWall[r][c] = 0
+
+            elif direction == 'S':
+                northWall[r - 1][c] = 0
+
+            elif direction == 'E':
+                eastWall[r][c] = 0
+
+            elif direction == 'W':
+                eastWall[r][c - 1] = 0
+
+            print("Cycle created!")
+
+            draw_maze()
+
+            pygame.time.delay(500)
+
+            cycle_wall = None
+
+            return
+
+
 # ---------------- SOLVE MAZE ----------------
 def solve():
 
@@ -261,38 +390,59 @@ def solve():
 
         # DOWN
         if r < R:
+
             if northWall[r][c] == 0:
+
                 if (r + 1, c) not in visited:
+
                     stack.append((r + 1, c))
+
                     visited.add((r + 1, c))
+
                     moved = True
 
         # UP
         if not moved and r > 1:
+
             if northWall[r - 1][c] == 0:
+
                 if (r - 1, c) not in visited:
+
                     stack.append((r - 1, c))
+
                     visited.add((r - 1, c))
+
                     moved = True
 
         # RIGHT
         if not moved and c < C:
+
             if eastWall[r][c] == 0:
+
                 if (r, c + 1) not in visited:
+
                     stack.append((r, c + 1))
+
                     visited.add((r, c + 1))
+
                     moved = True
 
         # LEFT
         if not moved and c > 1:
+
             if eastWall[r][c - 1] == 0:
+
                 if (r, c - 1) not in visited:
+
                     stack.append((r, c - 1))
+
                     visited.add((r, c - 1))
+
                     moved = True
 
         # dead end
         if not moved:
+
             dead_ends.add(stack.pop())
 
 
@@ -303,7 +453,9 @@ def main():
 
     pygame.init()
 
-    pygame.display.set_caption("Maze Generator and Solver")
+    pygame.display.set_caption(
+        "Maze Generator with Cycles"
+    )
 
     pygame.display.set_mode(
         (WIDTH, HEIGHT),
@@ -319,6 +471,9 @@ def main():
     # generate maze
     generate()
 
+    # add bonus cycle
+    add_cycle()
+
     # show start/end
     show_points = True
 
@@ -329,13 +484,15 @@ def main():
     # solve maze
     final_path = solve()
 
-    # keep final solution + dead ends forever
+    # keep final state forever
     while True:
 
         for event in pygame.event.get():
 
             if event.type == QUIT:
+
                 pygame.quit()
+
                 return
 
         draw_maze(
