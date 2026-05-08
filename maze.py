@@ -83,15 +83,51 @@ def draw_maze(path=None, dead=None):
     if show_points:
         draw_dots([start_cell, end_cell], START_END_COLOR, 16)
     pygame.display.flip()
+def generate():
+    visited = [[False for _ in range(C + 1)] for _ in range(R + 1)]
+    stack = []
+    r, c = start_cell
+    visited[r][c] = True
+    trail_cells.append((r, c))
+    count = 1
+    while count < R * C:
+        pygame.event.pump()
+        neighbors = []
+        if r < R and not visited[r + 1][c]: neighbors.append((r + 1, c, 'N'))
+        if r > 1 and not visited[r - 1][c]: neighbors.append((r - 1, c, 'S'))
+        if c < C and not visited[r][c + 1]: neighbors.append((r, c + 1, 'E'))
+        if c > 1 and not visited[r][c - 1]: neighbors.append((r, c - 1, 'W'))
+        if neighbors:
+            nr, nc, direction = random.choice(neighbors)
+            if direction == 'N': northWall[r][c] = 0
+            elif direction == 'S': northWall[r - 1][c] = 0
+            elif direction == 'E': eastWall[r][c] = 0
+            elif direction == 'W': eastWall[r][c - 1] = 0
+            stack.append((r, c))
+            r, c = nr, nc
+            visited[r][c] = True
+            trail_cells.append((r, c))
+            count += 1
+            draw_maze()
+            pygame.time.delay(30)
+        elif stack:
+            r, c = stack.pop()
+            draw_maze()
+            pygame.time.delay(15)
 
+# Update Main:
 def main():
     pygame.init()
     pygame.display.set_mode((WIDTH, HEIGHT), DOUBLEBUF | OPENGL)
     init_graphics()
     draw_maze()
+    pygame.time.wait(500)
+    generate()
     while True:
         for event in pygame.event.get():
-            if event.type == QUIT: pygame.quit(); return
-
+            if event.type == QUIT: 
+                pygame.quit(); 
+                return
+    
 if __name__ == "__main__":
     main()
